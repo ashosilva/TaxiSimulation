@@ -1,4 +1,4 @@
-# We Dispatch!, We Pickup!!, We Dropoff!!!. 
+# We Dispatch! We Pickup!! We Dropoff!!! 
 
 # Welcome to TaxiSim.
 

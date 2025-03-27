@@ -38,7 +38,7 @@ end
 
 ;; Function to spawn ride requests randomly
 to generate-rides
-  if random 20 = 0 [
+  if random 1 = 0 [
     let pickup-spot one-of patches with [is-street?]  ;; Only choose a street patch for pickup
     let dropoff-spot one-of patches with [is-street? and self != pickup-spot]  ;; Ensure dropoff is different
 
@@ -232,7 +232,7 @@ num-taxis
 num-taxis
 1
 50
-50.0
+10.0
 1
 1
 NIL

@@ -17,3 +17,9 @@
 - [ ] Calculate Ride Requests (total, completed, and unassaigned)
 - [ ] Average Wait Time (passengers wait time)
 
+
+## LINKS
+
+Download NetLog - https://ccl.northwestern.edu/netlogo/
+
+Documentation NetLogo - https://ccl.northwestern.edu/netlogo/docs/index2.html

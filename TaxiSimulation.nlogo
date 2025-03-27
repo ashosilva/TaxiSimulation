@@ -38,7 +38,7 @@ end
 
 ;; Function to spawn ride requests randomly
 to generate-rides
-  if random 1 = 0 [
+  if random 20 = 0 [
     let pickup-spot one-of patches with [is-street?]  ;; Only choose a street patch for pickup
     let dropoff-spot one-of patches with [is-street? and self != pickup-spot]  ;; Ensure dropoff is different
 
@@ -95,7 +95,7 @@ to move-taxis
         set has-passenger? true
         set dispatched? false
         ask pickup-patch [ set pcolor gray - 3 ]  ;; Reset pickup spot to street color
-        set ride-requests remove destination ride-requests
+        set ride-requests remove destination ride-requests ;; Remove completed ride request
       ]
     ]
 
@@ -112,8 +112,6 @@ to move-taxis
         set has-passenger? false
         set color white
         ask dropoff-patch [ set pcolor gray - 3 ]  ;; Reset dropoff spot to street color
-        ;; Remove completed ride request
-
       ]
 
     ]
@@ -232,7 +230,7 @@ num-taxis
 num-taxis
 1
 50
-10.0
+50.0
 1
 1
 NIL

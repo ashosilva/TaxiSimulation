@@ -1,1 +1,19 @@
-# We Dispatch!, We Pickup!!, and We Dropoff!!!. Welcome to Taxi Simulation.
+# We Dispatch!, We Pickup!!, and We Dropoff!!!. Welcome to TaxiSim.
+
+## MVP
+<ul>
+<li>- [x] Window View Patches (street top-view)</li>
+<li>- [x] Spawn Cars (randomly on street)</li>
+<li>- [x] Randomly Generate Rides (pick and dropoff location)</li>
+<li>- [x] Dispatch Taxi (nearest taxi to the pickup location)</li>
+<li>- [x] Driving Taxi (heads to the pickup location then to the dropoff location) </li>
+</ul>
+
+## TODO
+<ul>
+<li>- [ ] Traffic (randomly assign trffic to different parts on the stree)</li>
+<li>- [ ] Dispatch Taxi (based on traffic smartly send the best suitable taxi to the pickup location)</li>
+<li>- [ ] Average Distance Between Pickup and Dropoff Location</li>
+<li>- [ ] Calculate Ride Requests (total, completed, and unassaigned)</li>
+<li>- [ ] Average Wait Time (passengers wait time)</li>
+</ul>

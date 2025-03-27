@@ -1,4 +1,6 @@
-# We Dispatch!, We Pickup!!, and We Dropoff!!!. Welcome to TaxiSim.
+# We Dispatch!, We Pickup!!, We Dropoff!!!. 
+
+# Welcome to TaxiSim.
 
 ## MVP
 - [x] Window View Patches (street top-view)

@@ -2,7 +2,7 @@ globals [ride-requests wait-times]
 
 turtles-own [has-passenger? dispatched? destination speed pickup-time]
 
-patches-own [is-street?]
+patches-own [is-street? traffic-level]
 
 ;; Setup function
 to setup
@@ -10,16 +10,48 @@ to setup
   set ride-requests []
   set wait-times []
 
-  ;; Draw streets (every 5 patches as roads)
+  ;; Identify street patches
   ask patches [
-    if (pxcor mod 5 = 0) or (pycor mod 5 = 0) [
-      set pcolor gray - 3  ;; Streets
+    ifelse (pxcor mod 5 = 0) or (pycor mod 5 = 0) [
       set is-street? true
-    ]
-    if (pxcor mod 5 != 0) and (pycor mod 5 != 0) [
-      set pcolor black ;; Buildings/sidewalks
+    ] [
       set is-street? false
     ]
+  ]
+
+  ;; Set default traffic level and color for streets
+  ask patches with [is-street?] [
+    set traffic-level 1
+    set pcolor white
+  ]
+
+  ;; Create traffic jams (clustered congestion)
+  repeat 5 [
+    let traffic-center one-of patches with [
+      is-street? and
+      pxcor > (- max-pxcor + 5) and pxcor < (max-pxcor - 5) and
+      pycor > (- max-pycor + 5) and pycor < (max-pycor - 5)
+    ]
+    if traffic-center != nobody [
+      let x [pxcor] of traffic-center
+      let y [pycor] of traffic-center
+
+      ask patches with [
+        is-street? and
+        ((pxcor = x and abs(pycor - y) < 5) or (pycor = y and abs(pxcor - x) < 5))
+      ] [
+        set traffic-level one-of [2 3]
+      ]
+    ]
+  ]
+
+
+
+  ;; Apply traffic colors
+  ask patches with [is-street?] [
+    if traffic-level = 1 [ set pcolor white ]
+    if traffic-level = 2 [ set pcolor yellow ]
+    if traffic-level = 3 [ set pcolor brown ]
   ]
 
   ;; Create taxis
@@ -27,16 +59,17 @@ to setup
     move-to one-of patches with [is-street?]
     set has-passenger? false
     set dispatched? false
+    set destination []
     set speed 1
     set shape "car"
     set color white
-    set heading (one-of [0 90 180 270])  ;; Random heading
+    set heading one-of [0 90 180 270]
   ]
 
   reset-ticks
 end
 
-;; Function to spawn ride requests randomly
+;; Generate ride requests
 to generate-rides
   if random 20 = 0 [
     let pickup-spot one-of patches with [is-street?]
@@ -44,8 +77,8 @@ to generate-rides
 
     if (pickup-spot != nobody and dropoff-spot != nobody) [
       let new-request (list (list [pxcor] of pickup-spot [pycor] of pickup-spot)
-                              (list [pxcor] of dropoff-spot [pycor] of dropoff-spot)
-                              ticks)
+                            (list [pxcor] of dropoff-spot [pycor] of dropoff-spot)
+                            ticks)
       set ride-requests lput new-request ride-requests
       ask pickup-spot [set pcolor green]
       ask dropoff-spot [set pcolor red]
@@ -53,12 +86,11 @@ to generate-rides
   ]
 end
 
-;; Dispatcher function
+;; Dispatch taxis to ride requests
 to dispatch-taxis [strategy]
   let unassigned-requests []
   let assigned-taxis []
 
-  ;; Filter ride requests that haven't been assigned to a taxi yet
   foreach ride-requests [ request ->
     let already-assigned? any? turtles with [dispatched? and destination = request]
     if not already-assigned? [
@@ -66,7 +98,6 @@ to dispatch-taxis [strategy]
     ]
   ]
 
-  ;; Assign a unique taxi to each unassigned request
   foreach unassigned-requests [ request ->
     let pickup-location first request
     let chosen-taxi nobody
@@ -80,7 +111,7 @@ to dispatch-taxis [strategy]
     ]
 
     if strategy = "smart" [
-      ; to be implemented later
+      ; To be implemented later
     ]
 
     if chosen-taxi != nobody [
@@ -95,10 +126,10 @@ to dispatch-taxis [strategy]
   ]
 end
 
-;; Movement function
+;; Move taxis toward pickup or dropoff
 to move-taxis
   ask turtles [
-    ;; Go to pickup location if dispatched
+    ;; Going to pickup location
     if dispatched? [
       let pickup-location first destination
       let pickup-patch patch (item 0 pickup-location) (item 1 pickup-location)
@@ -106,11 +137,12 @@ to move-taxis
       move-algo pickup-patch
 
       if patch-here = pickup-patch [
-        ;; Arrived at pickup location
         set color blue
         set has-passenger? true
         set dispatched? false
-        ask pickup-patch [ set pcolor gray - 3 ]
+
+        ;; Restore original traffic color
+        recolor-street patch-here
 
         let request-time item 2 destination
         let wait-time (ticks - request-time)
@@ -122,7 +154,7 @@ to move-taxis
       ]
     ]
 
-    ;; Go to dropoff location if carrying a passenger
+    ;; Going to dropoff location
     if has-passenger? [
       let dropoff-location item 1 destination
       let dropoff-patch patch (item 0 dropoff-location) (item 1 dropoff-location)
@@ -132,19 +164,33 @@ to move-taxis
       if patch-here = dropoff-patch [
         set has-passenger? false
         set color white
-        ask dropoff-patch [ set pcolor gray - 3 ]
+
+        ;; Restore original traffic color
+        recolor-street patch-here
       ]
     ]
   ]
 end
 
-;; Basic movement toward goal
+;; Movement algorithm with traffic delays
 to move-algo [tpatch]
   if tpatch = nobody [ stop ]
   let next-move min-one-of neighbors4 with [is-street?] [distance tpatch]
   if next-move != nobody [
+    let traffic-factor ([traffic-level] of next-move)
     face next-move
-    fd speed
+    if (ticks mod traffic-factor) = 0 [
+      fd speed
+    ]
+  ]
+end
+
+;; Restore the correct patch color after pickup/dropoff
+to recolor-street [p]
+  ask p [
+    if traffic-level = 1 [ set pcolor white ]
+    if traffic-level = 2 [ set pcolor yellow ]
+    if traffic-level = 3 [ set pcolor brown ]
   ]
 end
 
@@ -156,6 +202,7 @@ to go
   tick
 end
 
+;; Report average wait time
 to-report average_wait_time
   if length wait-times > 0 [
     report mean wait-times

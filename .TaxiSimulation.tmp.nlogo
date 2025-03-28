@@ -1,4 +1,213 @@
+globals [ride-requests wait-times]
 
+turtles-own [has-passenger? dispatched? destination speed pickup-time]
+
+patches-own [is-street? traffic-level]
+
+;; Setup function
+to setup
+  clear-all
+  set ride-requests []
+  set wait-times []
+
+  ;; Identify street patches
+  ask patches [
+    ifelse (pxcor mod 5 = 0) or (pycor mod 5 = 0) [
+      set is-street? true
+    ] [
+      set is-street? false
+    ]
+  ]
+
+  ;; Set default traffic level and color for streets
+  ask patches with [is-street?] [
+    set traffic-level 1
+    set pcolor white
+  ]
+
+  ;; Create traffic jams (clustered congestion)
+  repeat 5 [
+    let traffic-center one-of patches with [
+      is-street? and
+      pxcor > (- max-pxcor + 5) and pxcor < (max-pxcor - 5) and
+      pycor > (- max-pycor + 5) and pycor < (max-pycor - 5)
+    ]
+    if traffic-center != nobody [
+
+
+      ask patches with [
+        is-street? and
+        ((pxcor = x and abs(pycor - y) < 5) or (pycor = y and abs(pxcor - x) < 5))
+      ] [
+        set traffic-level one-of [2 3]
+      ]
+    ]
+  ]
+
+
+
+  ;; Apply traffic colors
+  ask patches with [is-street?] [
+    if traffic-level = 1 [ set pcolor white ]
+    if traffic-level = 2 [ set pcolor yellow ]
+    if traffic-level = 3 [ set pcolor brown ]
+  ]
+
+  ;; Create taxis
+  create-turtles num-taxis [
+    move-to one-of patches with [is-street?]
+    set has-passenger? false
+    set dispatched? false
+    set destination []
+    set speed 1
+    set shape "car"
+    set color white
+    set heading one-of [0 90 180 270]
+  ]
+
+  reset-ticks
+end
+
+;; Generate ride requests
+to generate-rides
+  if random 20 = 0 [
+    let pickup-spot one-of patches with [is-street?]
+    let dropoff-spot one-of patches with [is-street? and self != pickup-spot]
+
+    if (pickup-spot != nobody and dropoff-spot != nobody) [
+      let new-request (list (list [pxcor] of pickup-spot [pycor] of pickup-spot)
+                            (list [pxcor] of dropoff-spot [pycor] of dropoff-spot)
+                            ticks)
+      set ride-requests lput new-request ride-requests
+      ask pickup-spot [set pcolor green]
+      ask dropoff-spot [set pcolor red]
+    ]
+  ]
+end
+
+;; Dispatch taxis to ride requests
+to dispatch-taxis [strategy]
+  let unassigned-requests []
+  let assigned-taxis []
+
+  foreach ride-requests [ request ->
+    let already-assigned? any? turtles with [dispatched? and destination = request]
+    if not already-assigned? [
+      set unassigned-requests lput request unassigned-requests
+    ]
+  ]
+
+  foreach unassigned-requests [ request ->
+    let pickup-location first request
+    let chosen-taxi nobody
+
+    if strategy = "nearest" [
+      set chosen-taxi min-one-of turtles with [
+        not has-passenger? and not dispatched? and not member? self assigned-taxis
+      ] [
+        distancexy (item 0 pickup-location) (item 1 pickup-location)
+      ]
+    ]
+
+    if strategy = "smart" [
+      ; To be implemented later
+    ]
+
+    if chosen-taxi != nobody [
+      ask chosen-taxi [
+        set destination request
+        set dispatched? true
+        set has-passenger? false
+        set color yellow
+      ]
+      set assigned-taxis lput chosen-taxi assigned-taxis
+    ]
+  ]
+end
+
+;; Move taxis toward pickup or dropoff
+to move-taxis
+  ask turtles [
+    ;; Going to pickup location
+    if dispatched? [
+      let pickup-location first destination
+      let pickup-patch patch (item 0 pickup-location) (item 1 pickup-location)
+
+      move-algo pickup-patch
+
+      if patch-here = pickup-patch [
+        set color blue
+        set has-passenger? true
+        set dispatched? false
+
+        ;; Restore original traffic color
+        recolor-street patch-here
+
+        let request-time item 2 destination
+        let wait-time (ticks - request-time)
+        set wait-times lput wait-time wait-times
+
+        show (word "🚕 Picked up ride with wait time: " wait-time ", All wait times: " wait-times)
+
+        set ride-requests remove destination ride-requests
+      ]
+    ]
+
+    ;; Going to dropoff location
+    if has-passenger? [
+      let dropoff-location item 1 destination
+      let dropoff-patch patch (item 0 dropoff-location) (item 1 dropoff-location)
+
+      move-algo dropoff-patch
+
+      if patch-here = dropoff-patch [
+        set has-passenger? false
+        set color white
+
+        ;; Restore original traffic color
+        recolor-street patch-here
+      ]
+    ]
+  ]
+end
+
+;; Movement algorithm with traffic delays
+to move-algo [tpatch]
+  if tpatch = nobody [ stop ]
+  let next-move min-one-of neighbors4 with [is-street?] [distance tpatch]
+  if next-move != nobody [
+    let traffic-factor ([traffic-level] of next-move)
+    face next-move
+    if (ticks mod traffic-factor) = 0 [
+      fd speed
+    ]
+  ]
+end
+
+;; Restore the correct patch color after pickup/dropoff
+to recolor-street [p]
+  ask p [
+    if traffic-level = 1 [ set pcolor white ]
+    if traffic-level = 2 [ set pcolor yellow ]
+    if traffic-level = 3 [ set pcolor brown ]
+  ]
+end
+
+;; Main simulation loop
+to go
+  generate-rides
+  dispatch-taxis dispatch-strategy
+  move-taxis
+  tick
+end
+
+;; Report average wait time
+to-report average_wait_time
+  if length wait-times > 0 [
+    report mean wait-times
+  ]
+  report 0
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 381

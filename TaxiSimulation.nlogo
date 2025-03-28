@@ -180,10 +180,11 @@ to move-algo [tpatch]
     let traffic-factor ([traffic-level] of next-move)
     face next-move
     if (ticks mod traffic-factor) = 0 [
-      fd speed
+      fd (speed / traffic-factor)  ;; move shorter distances in higher traffic
     ]
   ]
 end
+
 
 ;; Restore the correct patch color after pickup/dropoff
 to recolor-street [p]

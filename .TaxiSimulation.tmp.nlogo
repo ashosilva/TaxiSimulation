@@ -33,7 +33,8 @@ to setup
       pycor > (- max-pycor + 5) and pycor < (max-pycor - 5)
     ]
     if traffic-center != nobody [
-
+      let x [pxcor] of traffic-center
+      let y [pycor] of traffic-center
 
       ask patches with [
         is-street? and
@@ -172,17 +173,7 @@ to move-taxis
 end
 
 ;; Movement algorithm with traffic delays
-to move-algo [tpatch]
-  if tpatch = nobody [ stop ]
-  let next-move min-one-of neighbors4 with [is-street?] [distance tpatch]
-  if next-move != nobody [
-    let traffic-factor ([traffic-level] of next-move)
-    face next-move
-    if (ticks mod traffic-factor) = 0 [
-      fd speed
-    ]
-  ]
-end
+
 
 ;; Restore the correct patch color after pickup/dropoff
 to recolor-street [p]

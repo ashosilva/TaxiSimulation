@@ -140,12 +140,6 @@ to go
   tick
 end
 
-to-report average_wait_time
-  if length wait-times > 0 [
-    report mean wait-times
-  ]
-  report 0
-end
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -235,7 +229,7 @@ num-taxis
 num-taxis
 1
 50
-3.0
+1.0
 1
 1
 NIL
@@ -249,7 +243,7 @@ CHOOSER
 dispatch-strategy
 dispatch-strategy
 "nearest" "smart"
-1
+0
 
 BUTTON
 0

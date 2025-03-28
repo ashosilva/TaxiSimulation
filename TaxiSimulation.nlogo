@@ -5,7 +5,6 @@ turtles-own [has-passenger? dispatched? destination speed pickup-time]
 patches-own [is-street?]
 
 ;; Setup function
-
 to setup
   clear-all
   set ride-requests []
@@ -56,14 +55,30 @@ end
 
 ;; Dispatcher function
 to dispatch-taxis [strategy]
+  let unassigned-requests []
+  let assigned-taxis []
+
+  ;; Filter ride requests that haven't been assigned to a taxi yet
   foreach ride-requests [ request ->
+    let already-assigned? any? turtles with [dispatched? and destination = request]
+    if not already-assigned? [
+      set unassigned-requests lput request unassigned-requests
+    ]
+  ]
+
+  ;; Assign a unique taxi to each unassigned request
+  foreach unassigned-requests [ request ->
     let pickup-location first request
     let chosen-taxi nobody
 
     if strategy = "nearest" [
-      set chosen-taxi min-one-of turtles with [not has-passenger? and not dispatched?]
-        [distancexy (item 0 pickup-location) (item 1 pickup-location)]
+      set chosen-taxi min-one-of turtles with [
+        not has-passenger? and not dispatched? and not member? self assigned-taxis
+      ] [
+        distancexy (item 0 pickup-location) (item 1 pickup-location)
+      ]
     ]
+
     if strategy = "smart" [
       ; to be implemented later
     ]
@@ -75,6 +90,7 @@ to dispatch-taxis [strategy]
         set has-passenger? false
         set color yellow
       ]
+      set assigned-taxis lput chosen-taxi assigned-taxis
     ]
   ]
 end
@@ -146,7 +162,6 @@ to-report average_wait_time
   ]
   report 0
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 381
@@ -249,7 +264,7 @@ CHOOSER
 dispatch-strategy
 dispatch-strategy
 "nearest" "smart"
-1
+0
 
 BUTTON
 0

@@ -1,3 +1,5 @@
+extensions [table]
+
 globals [ride-requests wait-times]
 
 turtles-own [has-passenger? dispatched? destination speed pickup-time]
@@ -68,6 +70,13 @@ to setup
   reset-ticks
 end
 
+to go
+  generate-rides
+  dispatch-taxis dispatch-strategy
+  move-taxis
+  tick
+end
+
 ;; Generate ride requests
 to generate-rides
   if random 20 = 0 [
@@ -113,9 +122,19 @@ to dispatch-taxis [strategy]
       set chosen-taxi min-one-of turtles with [
         not has-passenger? and not dispatched? and not member? self assigned-taxis
       ] [
-        estimate-travel-time self (item 0 pickup-location) (item 1 pickup-location)
+        distancexy (item 0 pickup-location) (item 1 pickup-location)
       ]
     ]
+
+   if strategy = "super-smart" [
+      set chosen-taxi min-one-of turtles with [
+        not has-passenger? and not dispatched? and not member? self assigned-taxis
+      ] [
+        simplified-pathfinding self (item 0 pickup-location) (item 1 pickup-location)
+      ]
+    ]
+
+
 
     if chosen-taxi != nobody [
       ask chosen-taxi [
@@ -128,6 +147,61 @@ to dispatch-taxis [strategy]
     ]
   ]
 end
+
+to-report sign [n]
+  if n > 0 [ report 1 ]
+  if n < 0 [ report -1 ]
+  report 0
+end
+
+
+to-report simplified-pathfinding [taxi-agent goal-x goal-y]
+  let current-x [xcor] of taxi-agent
+  let current-y [ycor] of taxi-agent
+
+  let goal-patch patch goal-x goal-y  ;; The goal patch (we'll work with patches, not just coordinates)
+
+  let open-list (list (patch current-x current-y))  ;; List of patches to explore
+  let closed-list []  ;; List of visited patches
+
+  let g-score 0  ;; Travel cost so far
+
+  ;; Continue until destination is reached or all possible paths explored
+  while [length open-list > 0] [
+    let current-patch first open-list  ;; Get the first patch from open list
+    let x [pxcor] of current-patch
+    let y [pycor] of current-patch
+
+    if (current-patch = goal-patch) [
+      report g-score  ;; Return the total cost when the goal is reached
+    ]
+
+    ;; Move the current patch to closed-list (visited patches)
+    set open-list remove current-patch open-list
+    set closed-list lput current-patch closed-list
+
+    ;; Explore neighbors
+    let neighbor-patches (list patch (x + 1) y patch (x - 1) y patch x (y + 1) patch x (y - 1))
+    foreach neighbor-patches [neighbor ->
+      if neighbor != nobody and [is-street?] of neighbor [  ;; Check if neighbor is valid and a street
+        let nx [pxcor] of neighbor
+        let ny [pycor] of neighbor
+        let neighbor-cost (ifelse-value [is-street?] of neighbor [traffic-level] [1])
+
+        ;; Skip if neighbor already in closed-list
+        if not member? neighbor closed-list [
+          let new-cost (g-score + neighbor-cost)
+          set open-list lput neighbor open-list  ;; Add to open list
+          set g-score new-cost  ;; Update cost
+        ]
+      ]
+    ]
+  ]
+  report -1  ;; Return -1 if no path is found
+end
+
+
+
 
 ;; Movement function
 to move-taxis
@@ -194,63 +268,11 @@ to recolor-street [p]
   ]
 end
 
-;; Estimate travel time based on traffic and distance
-to-report estimate-travel-time [taxi-agent target-x target-y]
-  let current-x [xcor] of taxi-agent
-  let current-y [ycor] of taxi-agent
-
-  let x-distance abs(target-x - current-x)
-  let y-distance abs(target-y - current-y)
-  let estimated-steps x-distance + y-distance
-
-
-  let total-traffic 0
-  let sample-points 0
-
-  let step-x sign(target-x - current-x)
-  let step-y sign(target-y - current-y)
-
-  ;; Sample along x-axis
-  repeat dx [
-    set current-x (current-x + step-x)
-    if patch current-x current-y != nobody and [is-street?] of patch current-x current-y [
-      set total-traffic total-traffic + [traffic-level] of patch current-x current-y
-      set sample-points sample-points + 1
-    ]
-  ]
-
-  ;; Sample along y-axis
-  repeat dy [
-    set current-y (current-y + step-y)
-    if patch current-x current-y != nobody and [is-street?] of patch current-x current-y [
-      set total-traffic total-traffic + [traffic-level] of patch current-x current-y
-      set sample-points sample-points + 1
-    ]
-  ]
-
-  let avg-traffic (ifelse-value (sample-points > 0) [total-traffic / sample-points] [1])
-  report estimated-steps * avg-traffic
-end
-
-;; Main simulation loop
-to go
-  generate-rides
-  dispatch-taxis dispatch-strategy
-  move-taxis
-  tick
-end
-
 ;; Report average wait time
 to-report average_wait_time
   if length wait-times > 0 [
     report mean wait-times
   ]
-  report 0
-end
-
-to-report sign [n]
-  if n > 0 [ report 1 ]
-  if n < 0 [ report -1 ]
   report 0
 end
 @#$#@#$#@
@@ -354,8 +376,8 @@ CHOOSER
 134
 dispatch-strategy
 dispatch-strategy
-"nearest" "smart"
-0
+"nearest" "smart" "super-smart"
+2
 
 BUTTON
 0

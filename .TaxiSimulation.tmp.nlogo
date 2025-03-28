@@ -29,8 +29,8 @@ to setup
   repeat 5 [
     let traffic-center one-of patches with [
       is-street? and
-      pxcor > (- max-pxcor + 5) and pxcor < (max-pxcor - 5) and
-      pycor > (- max-pycor + 5) and pycor < (max-pycor - 5)
+      pxcor > ((0 - max-pxcor) + 5) and pxcor < (max-pxcor - 5) and
+      pycor > ((0 - max-pycor) + 5) and pycor < (max-pycor - 5)
     ]
     if traffic-center != nobody [
       let x [pxcor] of traffic-center
@@ -40,18 +40,17 @@ to setup
         is-street? and
         ((pxcor = x and abs(pycor - y) < 5) or (pycor = y and abs(pxcor - x) < 5))
       ] [
-        set traffic-level one-of [2 3]
+        set traffic-level one-of [2 3 4]
       ]
     ]
   ]
-
-
 
   ;; Apply traffic colors
   ask patches with [is-street?] [
     if traffic-level = 1 [ set pcolor white ]
     if traffic-level = 2 [ set pcolor yellow ]
     if traffic-level = 3 [ set pcolor brown ]
+    if traffic-level = 4 [ set pcolor gray ]
   ]
 
   ;; Create taxis
@@ -86,7 +85,7 @@ to generate-rides
   ]
 end
 
-;; Dispatch taxis to ride requests
+;; Dispatcher function
 to dispatch-taxis [strategy]
   let unassigned-requests []
   let assigned-taxis []
@@ -111,7 +110,11 @@ to dispatch-taxis [strategy]
     ]
 
     if strategy = "smart" [
-      ; To be implemented later
+      set chosen-taxi min-one-of turtles with [
+        not has-passenger? and not dispatched? and not member? self assigned-taxis
+      ] [
+        estimate-travel-time self (item 0 pickup-location) (item 1 pickup-location)
+      ]
     ]
 
     if chosen-taxi != nobody [
@@ -126,7 +129,7 @@ to dispatch-taxis [strategy]
   ]
 end
 
-;; Move taxis toward pickup or dropoff
+;; Movement function
 to move-taxis
   ask turtles [
     ;; Going to pickup location
@@ -140,8 +143,6 @@ to move-taxis
         set color blue
         set has-passenger? true
         set dispatched? false
-
-        ;; Restore original traffic color
         recolor-street patch-here
 
         let request-time item 2 destination
@@ -164,24 +165,71 @@ to move-taxis
       if patch-here = dropoff-patch [
         set has-passenger? false
         set color white
-
-        ;; Restore original traffic color
         recolor-street patch-here
       ]
     ]
   ]
 end
 
-;; Movement algorithm with traffic delays
+;; Movement with traffic delay and speed reduction
+to move-algo [tpatch]
+  if tpatch = nobody [ stop ]
+  let next-move min-one-of neighbors4 with [is-street?] [distance tpatch]
+  if next-move != nobody [
+    let traffic-factor ([traffic-level] of next-move)
+    face next-move
+    if (ticks mod traffic-factor) = 0 [
+      fd (speed / traffic-factor)
+    ]
+  ]
+end
 
-
-;; Restore the correct patch color after pickup/dropoff
+;; Recolor patch after taxi leaves
 to recolor-street [p]
   ask p [
     if traffic-level = 1 [ set pcolor white ]
     if traffic-level = 2 [ set pcolor yellow ]
     if traffic-level = 3 [ set pcolor brown ]
+    if traffic-level = 4 [ set pcolor gray ]
   ]
+end
+
+;; Estimate travel time based on traffic and distance
+to-report estimate-travel-time [taxi-agent target-x target-y]
+  let current-x [xcor] of taxi-agent
+  let current-y [ycor] of taxi-agent
+
+  let x-distance abs(target-x - current-x)
+  let y-distance abs(target-y - current-y)
+  let estimated-steps x-distance + y-distance
+
+
+  let total-traffic 0
+  let sample-points 0
+
+  let step-x sign(target-x - current-x)
+  let step-y sign(target-y - current-y)
+
+  ;; Sample along x-axis
+  repeat dx [
+    set current-x (current-x + step-x)
+    if patch current-x current-y != nobody and [is-street?] of patch current-x current-y [
+      set total-traffic total-traffic + [traffic-level] of patch current-x current-y
+      set sample-points sample-points + 1
+    ]
+  ]
+
+  ;; Sample along y-axis
+  repeat dy [
+    set current-y (current-y + step-y)
+    if patch current-x current-y != nobody and [is-street?] of patch current-x current-y [
+      set total-traffic total-traffic + [traffic-level] of patch current-x current-y
+      set sample-points sample-points + 1
+    ]
+  ]
+
+  let avg-traffic (ifelse-value (sample-points > 0) [total-traffic / sample-points] [1])
+  report estimated-steps * avg-traffic
 end
 
 ;; Main simulation loop
@@ -199,6 +247,7 @@ to-report average_wait_time
   ]
   report 0
 end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 381

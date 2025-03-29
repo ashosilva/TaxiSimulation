@@ -141,7 +141,7 @@ to dispatch-taxis [strategy]
         set destination request
         set dispatched? true
         set has-passenger? false
-        set color green
+        set color yello
       ]
       set assigned-taxis lput chosen-taxi assigned-taxis
     ]
@@ -214,7 +214,7 @@ to move-taxis
       move-algo pickup-patch
 
       if patch-here = pickup-patch [
-        set color red
+        set color green
         set has-passenger? true
         set dispatched? false
         recolor-street patch-here
@@ -238,7 +238,7 @@ to move-taxis
 
       if patch-here = dropoff-patch [
         set has-passenger? false
-        set color black
+        set color white
         recolor-street patch-here
       ]
     ]

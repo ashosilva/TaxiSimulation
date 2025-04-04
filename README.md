@@ -10,12 +10,12 @@
 - [x] Driving Taxi (heads to the pickup location then to the dropoff location)
 - [x] Traffic (randomly assign trffic to different parts on the stree)
 - [x] Dispatch Taxi (based on traffic smartly send the best suitable taxi to the pickup location)
+- [x] Average Wait Time (passengers wait time)
 
 
 ## TODO
 - [ ] Average Distance Between Pickup and Dropoff Location
 - [ ] Calculate Ride Requests (total, completed, and unassaigned)
-- [ ] Average Wait Time (passengers wait time)
 
 
 ## LINKS

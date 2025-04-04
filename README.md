@@ -11,6 +11,7 @@
 - [x] Traffic (randomly assign trffic to different parts on the stree)
 - [x] Dispatch Taxi (based on traffic smartly send the best suitable taxi to the pickup location)
 - [x] Average Wait Time (passengers wait time)
+- [x] Smart Strategy (faster pickups and dropoffs)
 
 
 ## TODO

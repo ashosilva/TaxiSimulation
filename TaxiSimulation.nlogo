@@ -99,7 +99,6 @@ to generate-rides
   ]
 end
 
-;; Dispatcher function
 to dispatch-taxis [strategy]
   let unassigned-requests []
   let assigned-taxis []
@@ -113,18 +112,37 @@ to dispatch-taxis [strategy]
 
   foreach unassigned-requests [ request ->
     let pickup-location first request
+    let pickup-x item 0 pickup-location
+    let pickup-y item 1 pickup-location
     let chosen-taxi nobody
 
     if strategy = "nearest" [
       set chosen-taxi min-one-of turtles with [
         not has-passenger? and not dispatched? and not member? self assigned-taxis
       ] [
-        distancexy (item 0 pickup-location) (item 1 pickup-location)
+        distancexy pickup-x pickup-y
       ]
     ]
 
     if strategy = "smart" [
-      ;; We'll implement this next!
+      let available-taxis turtles with [
+        not has-passenger? and not dispatched? and not member? self assigned-taxis
+      ]
+
+      let min-cost 1e10  ;; very large number
+      ask available-taxis [
+        let cost simplified-pathfinding self pickup-x pickup-y
+        if (cost < min-cost) [
+          set min-cost cost
+          set chosen-taxi self
+        ]
+      ]
+
+      if chosen-taxi != nobody [
+        print (word "SMART: Taxi #" [who] of chosen-taxi
+                    " dispatched to request " request
+                    " with estimated travel cost: " min-cost)
+      ]
     ]
 
     if strategy = "super-smart" [
@@ -142,6 +160,9 @@ to dispatch-taxis [strategy]
     ]
   ]
 end
+
+
+
 
 to-report sign [n]
   if n > 0 [ report 1 ]
@@ -371,7 +392,7 @@ CHOOSER
 dispatch-strategy
 dispatch-strategy
 "nearest" "smart" "super-smart"
-0
+1
 
 BUTTON
 0

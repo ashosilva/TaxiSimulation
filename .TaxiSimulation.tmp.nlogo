@@ -60,8 +60,6 @@ to setup
   ;; Save all congested streets (traffic level > 1)
   set congested-streets patches with [is-street? and traffic-level > 1]
 
-
-
   ;; Create taxis
   create-turtles num-taxis [
     move-to one-of patches with [is-street?]
@@ -101,49 +99,9 @@ to generate-rides
   ]
 end
 
-;; Dispatcher function
-to dispatch-taxis [strategy]
-  let unassigned-requests []
-  let assigned-taxis []
 
-  foreach ride-requests [ request ->
-    let already-assigned? any? turtles with [dispatched? and destination = request]
-    if not already-assigned? [
-      set unassigned-requests lput request unassigned-requests
-    ]
-  ]
 
-  foreach unassigned-requests [ request ->
-    let pickup-location first request
-    let chosen-taxi nobody
 
-    if strategy = "nearest" [
-      set chosen-taxi min-one-of turtles with [
-        not has-passenger? and not dispatched? and not member? self assigned-taxis
-      ] [
-        distancexy (item 0 pickup-location) (item 1 pickup-location)
-      ]
-    ]
-
-    if strategy = "smart" [
-      ;; We'll implement this next!
-    ]
-
-    if strategy = "super-smart" [
-      ;; Future step
-    ]
-
-    if chosen-taxi != nobody [
-      ask chosen-taxi [
-        set destination request
-        set dispatched? true
-        set has-passenger? false
-        set color green
-      ]
-      set assigned-taxis lput chosen-taxi assigned-taxis
-    ]
-  ]
-end
 
 to-report sign [n]
   if n > 0 [ report 1 ]
@@ -373,7 +331,7 @@ CHOOSER
 dispatch-strategy
 dispatch-strategy
 "nearest" "smart" "super-smart"
-0
+1
 
 BUTTON
 0

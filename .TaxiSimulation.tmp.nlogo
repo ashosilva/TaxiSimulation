@@ -83,21 +83,7 @@ to go
   tick
 end
 
-to generate-rides
-  if random 1 = 0 [
-    let pickup-spot one-of patches with [is-street?]
-    let dropoff-spot one-of patches with [is-street? and self != pickup-spot]
 
-    if (pickup-spot != nobody and dropoff-spot != nobody) [
-      let new-request (list (list [pxcor] of pickup-spot [pycor] of pickup-spot)
-                            (list [pxcor] of dropoff-spot [pycor] of dropoff-spot)
-                            ticks)
-      set ride-requests lput new-request ride-requests
-      ask pickup-spot [set pcolor green]
-      ask dropoff-spot [set pcolor red]
-    ]
-  ]
-end
 
 to dispatch-taxis [strategy]
   let unassigned-requests []
@@ -146,6 +132,7 @@ to dispatch-taxis [strategy]
       ] unassigned-requests
 
 
+      let top-3 sublist sorted-requests 0 (min (list 3 length sorted-requests))
 
 
       let best-request nobody

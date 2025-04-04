@@ -84,7 +84,7 @@ to go
 end
 
 to generate-rides
-  if random 1 = 0 [
+  if (random-float 1 < 0.3) and (length ride-requests < 20) [
     let pickup-spot one-of patches with [is-street?]
     let dropoff-spot one-of patches with [is-street? and self != pickup-spot]
 
@@ -98,6 +98,7 @@ to generate-rides
     ]
   ]
 end
+
 
 to dispatch-taxis [strategy]
   let unassigned-requests []

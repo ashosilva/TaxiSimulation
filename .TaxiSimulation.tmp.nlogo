@@ -60,6 +60,8 @@ to setup
   ;; Save all congested streets (traffic level > 1)
   set congested-streets patches with [is-street? and traffic-level > 1]
 
+
+
   ;; Create taxis
   create-turtles num-taxis [
     move-to one-of patches with [is-street?]

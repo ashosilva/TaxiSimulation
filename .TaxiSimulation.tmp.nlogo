@@ -76,7 +76,7 @@ to setup
 end
 
 to go
-  if ticks >= 800 [ stop ]
+  if ticks >= 500 [ stop ]
   generate-rides
   dispatch-taxis dispatch-strategy
   move-taxis
@@ -174,44 +174,6 @@ to dispatch-taxis [strategy]
       ]
     ]
   ]
-  if strategy = "super-smart" [
-  let available-taxis turtles with [
-    not has-passenger? and not dispatched? and not member? self assigned-taxis
-  ]
-
-  ask available-taxis [
-    let sorted-requests sort-by
-      [[a b] ->
-        distancexy (item 0 (first a)) (item 1 (first a)) <
-        distancexy (item 0 (first b)) (item 1 (first b))
-      ] unassigned-requests
-
-    let top-8 sublist sorted-requests 0 (min (list 8 length sorted-requests))
-
-    let best-request nobody
-    let best-traffic 1e10
-
-    foreach top-8 [ request ->
-      let pickup-x item 0 (first request)
-      let pickup-y item 1 (first request)
-      let pickup-traffic [traffic-level] of patch pickup-x pickup-y
-
-      if pickup-traffic < best-traffic [
-        set best-traffic pickup-traffic
-        set best-request request
-      ]
-    ]
-
-    if best-request != nobody [
-      set destination best-request
-      set dispatched? true
-      set has-passenger? false
-      set color green
-      set assigned-taxis lput self assigned-taxis
-      set unassigned-requests remove best-request unassigned-requests
-    ]
-  ]
-]
 
 
 
@@ -428,7 +390,7 @@ CHOOSER
 dispatch-strategy
 dispatch-strategy
 "nearest" "smart" "super-smart"
-2
+1
 
 BUTTON
 0

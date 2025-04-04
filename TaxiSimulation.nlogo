@@ -1,6 +1,6 @@
 extensions [table]
 
-globals [ride-requests wait-times congested-streets]
+globals [ride-requests wait-times congested-streets nearest-results smart-results]
 
 turtles-own [has-passenger? dispatched? destination speed pickup-time]
 
@@ -76,13 +76,13 @@ to setup
 end
 
 to go
+  if ticks >= 500 [ stop ]
   generate-rides
   dispatch-taxis dispatch-strategy
   move-taxis
   tick
 end
 
-;; Generate ride requests
 to generate-rides
   if random 1 = 0 [
     let pickup-spot one-of patches with [is-street?]
@@ -110,59 +110,73 @@ to dispatch-taxis [strategy]
     ]
   ]
 
-  foreach unassigned-requests [ request ->
-    let pickup-location first request
-    let pickup-x item 0 pickup-location
-    let pickup-y item 1 pickup-location
-    let chosen-taxi nobody
+  if strategy = "nearest" [
+    foreach unassigned-requests [ request ->
+      let pickup-location first request
+      let pickup-x item 0 pickup-location
+      let pickup-y item 1 pickup-location
 
-    if strategy = "nearest" [
-      set chosen-taxi min-one-of turtles with [
+      let chosen-taxi min-one-of turtles with [
         not has-passenger? and not dispatched? and not member? self assigned-taxis
       ] [
         distancexy pickup-x pickup-y
       ]
+
+      if chosen-taxi != nobody [
+        ask chosen-taxi [
+          set destination request
+          set dispatched? true
+          set has-passenger? false
+          set color green
+        ]
+        set assigned-taxis lput chosen-taxi assigned-taxis
+      ]
+    ]
+  ]
+  if strategy = "smart" [
+    let available-taxis turtles with [
+      not has-passenger? and not dispatched? and not member? self assigned-taxis
     ]
 
-    if strategy = "smart" [
-      let available-taxis turtles with [
-        not has-passenger? and not dispatched? and not member? self assigned-taxis
-      ]
+    ask available-taxis [
+      let sorted-requests sort-by
+      [[a b] ->
+        distancexy (item 0 (first a)) (item 1 (first a))
+        < distancexy (item 0 (first b)) (item 1 (first b))
+      ] unassigned-requests
 
-      let min-cost 1e10  ;; very large number
-      ask available-taxis [
-        let cost simplified-pathfinding self pickup-x pickup-y
-        if (cost < min-cost) [
-          set min-cost cost
-          set chosen-taxi self
+
+      let top-3 sublist sorted-requests 0 (min (list 3 length sorted-requests))
+
+
+      let best-request nobody
+      let best-traffic 1e10
+
+      foreach top-3 [ request ->
+        let pickup-x item 0 (first request)
+        let pickup-y item 1 (first request)
+        let pickup-traffic [traffic-level] of patch pickup-x pickup-y
+
+        if pickup-traffic < best-traffic [
+          set best-traffic pickup-traffic
+          set best-request request
         ]
       ]
 
-      if chosen-taxi != nobody [
-        print (word "SMART: Taxi #" [who] of chosen-taxi
-                    " dispatched to request " request
-                    " with estimated travel cost: " min-cost)
-      ]
-    ]
-
-    if strategy = "super-smart" [
-      ;; Future step
-    ]
-
-    if chosen-taxi != nobody [
-      ask chosen-taxi [
-        set destination request
+      if best-request != nobody [
+        set destination best-request
         set dispatched? true
         set has-passenger? false
         set color green
+        set assigned-taxis lput self assigned-taxis
+        set unassigned-requests remove best-request unassigned-requests
       ]
-      set assigned-taxis lput chosen-taxi assigned-taxis
     ]
   ]
+
+
+
 end
-
-
-
 
 to-report sign [n]
   if n > 0 [ report 1 ]
@@ -170,43 +184,31 @@ to-report sign [n]
   report 0
 end
 
-to-report simplified-pathfinding [taxi-agent goal-x goal-y]
-  let current-x [xcor] of taxi-agent
-  let current-y [ycor] of taxi-agent
 
-  let goal-patch patch goal-x goal-y
-  let open-list (list (patch current-x current-y))
-  let closed-list []
-  let g-score 0
+to-report straight-path-traffic-cost [start-x start-y end-x end-y]
+  let cost 0
+  let delta-x sign (end-x - start-x)
+  let delta-y sign (end-y - start-y)
+  let x start-x
+  let y start-y
 
-  while [length open-list > 0] [
-    let current-patch first open-list
-    let x [pxcor] of current-patch
-    let y [pycor] of current-patch
-
-    if (current-patch = goal-patch) [
-      report g-score
+  while [x != end-x or y != end-y] [
+    if x != end-x [ set x x + delta-x ]
+    if y != end-y [ set y y + delta-y ]
+    let p patch x y
+    ifelse [is-street?] of p
+    [
+      set cost cost + [traffic-level] of p
+    ]
+    [
+      set cost cost + 5  ;; optional penalty for off-street
     ]
 
-    set open-list remove current-patch open-list
-    set closed-list lput current-patch closed-list
-
-    let neighbor-patches (list patch (x + 1) y patch (x - 1) y patch x (y + 1) patch x (y - 1))
-    foreach neighbor-patches [neighbor ->
-      if neighbor != nobody and [is-street?] of neighbor [
-        let neighbor-cost (ifelse-value [is-street?] of neighbor [traffic-level] [1])
-        if not member? neighbor closed-list [
-          let new-cost (g-score + neighbor-cost)
-          set open-list lput neighbor open-list
-          set g-score new-cost
-        ]
-      ]
-    ]
   ]
-  report -1
+  report cost
 end
 
-;; Recolor patch after taxi leaves or picks up passenger
+
 to recolor-street [p]
   ask p [
     if traffic-level = 1 [ set pcolor white ]
@@ -216,8 +218,6 @@ to recolor-street [p]
   ]
 end
 
-
-;; Movement function
 to move-taxis
   ask turtles [
     if dispatched? [
@@ -254,7 +254,6 @@ to move-taxis
   ]
 end
 
-;; Movement with traffic delay and speed reduction
 to move-algo [tpatch]
   if tpatch = nobody [ stop ]
   let next-move min-one-of neighbors4 with [is-street?] [distance tpatch]
@@ -267,7 +266,6 @@ to move-algo [tpatch]
   ]
 end
 
-;; Report if patch is a corner
 to-report is-corner? [p]
   let vertical? any? patches with [
     is-street? and
@@ -282,8 +280,6 @@ to-report is-corner? [p]
   report vertical? and horizontal?
 end
 
-
-;; Report average wait time
 to-report average_wait_time
   if length wait-times > 0 [
     report mean wait-times
@@ -378,7 +374,7 @@ num-taxis
 num-taxis
 1
 50
-5.0
+25.0
 1
 1
 NIL

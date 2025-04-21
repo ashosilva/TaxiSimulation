@@ -76,7 +76,7 @@ to setup
 end
 
 to go
-  if ticks >= 500 [ stop ]
+  if ticks >=  [ stop ]
   generate-rides
   dispatch-taxis dispatch-strategy
   move-taxis
@@ -99,6 +99,118 @@ to generate-rides
   ]
 end
 
+to-report best-of-5-path-cost [start-x start-y end-x end-y]
+  let directions [
+    ["hv"]  ;; horizontal first, then vertical
+    ["vh"]  ;; vertical first, then horizontal
+    ["zigzag1"]
+    ["zigzag2"]
+    ["straight-diagonal"]
+  ]
+  let best-cost 1e10
+
+  foreach directions [ pattern ->
+    let cost estimate-path-cost start-x start-y end-x end-y pattern
+    if cost < best-cost [
+      set best-cost cost
+    ]
+  ]
+
+  report best-cost
+end
+
+to-report estimate-path-cost [x1 y1 x2 y2 style]
+  let cost 0
+  let x x1
+  let y y1
+  let step-count 0
+  let max-steps 200
+
+  show (word "🧠 Estimating path [" style "] from (" x1 "," y1 ") to (" x2 "," y2 ")")
+
+  while [x != x2 or y != y2 and step-count < max-steps] [
+    set step-count step-count + 1
+    show (word "🚶 Step " step-count ": (" x "," y ")")
+
+    ;; Movement logic (guarantees progress)
+    if style = "hv" [
+      if x != x2 [ set x x + sign(x2 - x) ]
+      if x = x2 and y != y2 [ set y y + sign(y2 - y) ]
+    ]
+
+    if style = "vh" [
+      if y != y2 [ set y y + sign(y2 - y) ]
+      if y = y2 and x != x2 [ set x x + sign(x2 - x) ]
+    ]
+
+    if style = "zigzag1" [
+      if step-count mod 2 = 0 and x != x2 [
+        set x x + sign(x2 - x)
+      ]
+      if step-count mod 2 != 0 and y != y2 [
+        set y y + sign(y2 - y)
+      ]
+      ;; fallback
+      if x = x1 and y = y1 [
+        if x != x2 [ set x x + sign(x2 - x) ]
+        if y != y2 [ set y y + sign(y2 - y) ]
+      ]
+    ]
+
+    if style = "zigzag2" [
+      if step-count mod 2 = 0 and y != y2 [
+        set y y + sign(y2 - y)
+      ]
+      if step-count mod 2 != 0 and x != x2 [
+        set x x + sign(x2 - x)
+      ]
+      ;; fallback
+      if x = x1 and y = y1 [
+        if x != x2 [ set x x + sign(x2 - x) ]
+        if y != y2 [ set y y + sign(y2 - y) ]
+      ]
+    ]
+
+    if style = "bounce" [
+      if step-count mod 4 < 2 and x != x2 [
+        set x x + sign(x2 - x)
+      ]
+      if step-count mod 4 >= 2 and y != y2 [
+        set y y + sign(y2 - y)
+      ]
+    ]
+
+    ;; Traffic cost
+    if x >= min-pxcor and x <= max-pxcor and y >= min-pycor and y <= max-pycor [
+      let p patch x y
+      if p != nobody [
+        if [is-street?] of p [
+          set cost cost + [traffic-level] of p
+        ]
+        if not [is-street?] of p [
+          set cost cost + 5
+        ]
+      ]
+    ]
+
+    if x < min-pxcor or x > max-pxcor or y < min-pycor or y > max-pycor [
+      show (word "⚠️ Out of bounds at (" x "," y "), adding penalty.")
+      set cost cost + 10
+    ]
+  ]
+
+  if step-count >= max-steps [
+    show (word "💀 Max steps reached at (" x "," y ") — giving up.")
+    report 1e10
+  ]
+
+  show (word "✅ Final cost: " cost)
+  report cost
+end
+
+
+
+
 
 to dispatch-taxis [strategy]
   let unassigned-requests []
@@ -110,6 +222,33 @@ to dispatch-taxis [strategy]
       set unassigned-requests lput request unassigned-requests
     ]
   ]
+
+  if strategy = "random" [
+    let available-taxis turtles with [
+      not has-passenger? and not dispatched?
+    ]
+
+    let shuffled-requests shuffle unassigned-requests
+
+    foreach (list available-taxis) [ taxi ->
+      if length shuffled-requests > 0 [
+        let request first shuffled-requests  ;; pick one in order
+        set shuffled-requests but-first shuffled-requests  ;; remove it so no one else gets it
+
+        ask taxi [
+          set destination request
+          set dispatched? true
+          set has-passenger? false
+          set color cyan
+        ]
+        set assigned-taxis lput taxi assigned-taxis
+        set unassigned-requests remove request unassigned-requests
+      ]
+    ]
+  ]
+
+
+
 
   if strategy = "nearest" [
     foreach unassigned-requests [ request ->
@@ -174,6 +313,60 @@ to dispatch-taxis [strategy]
       ]
     ]
   ]
+  if strategy = "super-smart" [
+    let k 3  ;; number of ride requests to evaluate per taxi
+
+    let available-taxis turtles with [
+      not has-passenger? and not dispatched? and not member? self assigned-taxis
+    ]
+
+    ask available-taxis [
+      let taxi-x xcor
+      let taxi-y ycor
+      show (word "🚕 Taxi " who " starting super-smart dispatch from (" taxi-x "," taxi-y ")")
+
+      let sorted-requests sort-by
+      [[a b] ->
+        distancexy (item 0 (first a)) (item 1 (first a)) <
+        distancexy (item 0 (first b)) (item 1 (first b))
+      ] unassigned-requests
+
+      let top-k sublist sorted-requests 0 (min (list k length sorted-requests))
+
+      let best-request nobody
+      let best-cost 1e10
+
+      foreach top-k [ request ->
+        let pickup-x item 0 (first request)
+        let pickup-y item 1 (first request)
+        show (word "🔍 Taxi " who " checking request: " request)
+
+        let cost best-of-5-path-cost taxi-x taxi-y pickup-x pickup-y
+        show (word "📏 Estimated pickup path cost: " cost)
+
+        if cost < best-cost [
+          set best-cost cost
+          set best-request request
+          show (word "✅ New best request for Taxi " who ": " request " (Cost: " cost ")")
+        ]
+      ]
+     ifelse best-request != nobody [
+        set destination best-request
+        set dispatched? true
+        set has-passenger? false
+        set color blue
+        set assigned-taxis lput self assigned-taxis
+        set unassigned-requests remove best-request unassigned-requests
+        show (word "🎯 Taxi " who " assigned to: " best-request)
+      ] [
+        show (word "⚠️ Taxi " who " found NO valid request.")
+      ]
+
+    ]
+  ]
+
+
+
 
 
 
@@ -253,6 +446,14 @@ to move-taxis
         recolor-street patch-here
       ]
     ]
+
+    if dispatched? and not member? destination ride-requests [
+      ;; The ride was picked up already — cancel this taxi's trip
+      set dispatched? false
+      set destination []
+      set color black
+    ]
+
   ]
 end
 
@@ -389,8 +590,8 @@ CHOOSER
 134
 dispatch-strategy
 dispatch-strategy
-"nearest" "smart" "super-smart"
-1
+"random" "nearest" "smart" "super-smart"
+0
 
 BUTTON
 0

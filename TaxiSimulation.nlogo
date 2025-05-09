@@ -239,7 +239,7 @@ to dispatch-taxis [strategy]
           set destination request
           set dispatched? true
           set has-passenger? false
-          set color cyan
+          set color green
         ]
         set assigned-taxis lput taxi assigned-taxis
         set unassigned-requests remove request unassigned-requests
@@ -354,7 +354,7 @@ to dispatch-taxis [strategy]
         set destination best-request
         set dispatched? true
         set has-passenger? false
-        set color blue
+        set color green
         set assigned-taxis lput self assigned-taxis
         set unassigned-requests remove best-request unassigned-requests
         show (word "🎯 Taxi " who " assigned to: " best-request)
@@ -590,8 +590,8 @@ CHOOSER
 134
 dispatch-strategy
 dispatch-strategy
-"random" "nearest" "smart" "super-smart"
-0
+"random" "nearest" "smart"
+2
 
 BUTTON
 0
